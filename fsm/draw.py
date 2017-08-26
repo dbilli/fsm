@@ -1,5 +1,6 @@
 
-import pygraphviz as pgv
+#import pygraphviz as pgv
+import pydot as pgv
 
 from fsm.machine import FiniteStateMachine
 
@@ -10,26 +11,29 @@ class GraphvizDrawer(object):
 
 		
 
-		G = pgv.AGraph(
-			name='fsm', 
-			rankdir='LR', 
-			#rank='same',
-			directed=True, 
-			# size="24,1000",
-			#packmode='node',
-			#clusterrank='local', 
-			#compound=True, 
-			#rank='same ' + ' '.join(self.states.keys()),
-			#newrank=True,
-			#splines='line',
-			#ranksep='10'
-		)
+		#G = pgv.AGraph(
+		#	name='fsm', 
+		#	rankdir='LR', 
+		#	#rank='same',
+		#	directed=True, 
+		#	# size="24,1000",
+		#	#packmode='node',
+		#	#clusterrank='local', 
+		#	#compound=True, 
+		#	#rank='same ' + ' '.join(self.states.keys()),
+		#	#newrank=True,
+		#	#splines='line',
+		#	#ranksep='10'
+		#)
+		
+		G = pgv.Dot(graph_type='digraph')
+		
 
 		for state, state_info in fsm.states.items():
 			options = {}
 			if state_info['type'] in [ FiniteStateMachine.STATE_START, FiniteStateMachine.STATE_FINAL]:
 				options['shape'] = "doublecircle"
-			G.add_node(state, **options)
+			G.add_node(pgv.Node(state, **options))
 
 		"""
 		print G
@@ -130,13 +134,29 @@ class GraphvizDrawer(object):
 					state_info = fsm.states[next_state]
 
 
-					options = {}
+					label = input.to_string()
+
+					print start_state, label, next_state
+
+					import time
+					options = {
+						'key'  : label.replace('{','').replace('}',''), 
+						'label': label,
+					}
 					#if start_state > next_state:
 					#	options['weight'] = 0
-
-					G.add_edge(start_state, next_state, label=input.to_string(), **options)
+					G.add_edge(pgv.Edge(start_state, next_state, **options))
 
 		print G
 
-		G.draw(file_name, prog='dot')
+		G.write_png(file_name)#, prog='dot')
+
+
+if __name__ == "__main__":
 	
+	#G=pgv.AGraph()
+	G=pgv.Dot(graph_type='digraph')
+	G.add_edge(pgv.Edge('a','b', key='label1', label='label a'))
+	G.add_edge(pgv.Edge('a','b', key='label2', label='label b'))
+	#for e in G.edges(): print e, e.attr['label']
+	G.write_png('fsm.png')

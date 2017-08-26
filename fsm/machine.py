@@ -1,4 +1,4 @@
-
+import time
 
 GROUP_NAME = "g_%s"
 
@@ -104,9 +104,12 @@ class FiniteStateMachine(object):
 			
 		return self.e_reduce(start)
 
-	def e_reduce(self, state):
+	def e_reduce(self, state, states=None):
 		
-			states = set()
+			fsm = self
+		
+			if states is None:
+				states = set()
 			
 			transitions = fsm.transition_table.get(state,{})
 			
@@ -115,16 +118,19 @@ class FiniteStateMachine(object):
 				
 				input = fsm.inputs[input_id]
 
-				print input_id, input, transitions_info
+				#print input_id, input, transitions_info
 
 				for tran in transitions_info:
 					next_state = tran['next_state']
 					
-					print "\t", next_state
+					#print "\t", next_state
+					
+					if next_state in states:
+						continue
 
 					if input == FiniteStateMachine.EPSILON:
 						states.add(next_state)
-						states = states | self.e_reduce(next_state)
+						states = states | self.e_reduce(next_state, states)
 					#else:
 					#	states.add(next_state)
 					
@@ -173,141 +179,110 @@ class FiniteStateMachine(object):
 
 		transitions.append( transition_action )
 
-	def draw(self, file_name):
+	def reduce(self):
+		
+		print "REDUCING"
+		
+		fsm = self
+		
+		fsm2 = FiniteStateMachine()
+		
+		s_start = fsm.get_initial_state()
+		
+		aggregated = []
+		for s in s_start:
+			aggregated.append(s)
+			for next_s in fsm.e_reduce(s):
+				aggregated.append(next_s)
 
-		import pygraphviz as pgv
+		aggregated = sorted(set(aggregated))
+		aggregated_state = ';'.join(sorted(aggregated))
+		fsm2.set_state(aggregated_state, type=FiniteStateMachine.STATE_START)
+		
+		print "START", aggregated_state
 
-		G = pgv.AGraph(
-			name='fsm', 
-			rankdir='LR', 
-			#rank='same',
-			directed=True, 
-			# size="24,1000",
-			#packmode='node',
-			#clusterrank='local', 
-			#compound=True, 
-			#rank='same ' + ' '.join(self.states.keys()),
-			#newrank=True,
-			#splines='line',
-			#ranksep='10'
-		)
 
-		for state, state_info in self.states.items():
-			options = {}
-			if state_info['type'] in [ FiniteStateMachine.STATE_START, FiniteStateMachine.STATE_FINAL]:
-				options['shape'] = "doublecircle"
-			G.add_node(state, **options)
+		aggregated_to_process = []
+		aggregated_to_process.append(aggregated)
 
-		"""
-		print G
+		
+		turn = 0
+		while aggregated_to_process:
+			
+			print "TURN", turn
+			
+			start_aggregated = aggregated_to_process.pop()
 
-		states_by_group = {}
-		for s in self.states.values():
+			start_aggregated_id = ';'.join(sorted(start_aggregated))
 
-			g_name = s['group']
-			if not g_name:
+			next_aggregated = []
+			inputs = []
+			
+			for s in start_aggregated:
+				
+				print "\t", s
+				
+				transitions = fsm.transition_table.get(s,{})
+				
+				for input_id, transitions_info in transitions.items():
+
+					
+					input = fsm.inputs[input_id]
+					
+					if input.id is FiniteStateMachine.EPSILON.id:
+						continue
+					
+					inputs.append(input)
+			
+					for tran in transitions_info:
+						next_state = tran['next_state']
+			
+						print "\t" * 2, "TRANSITION", input_id, s_start
+
+						aggregated = []
+						aggregated.append(next_state)
+						for reduced_s in fsm.e_reduce(next_state):
+							aggregated.append(reduced_s)
+								
+						next_aggregated += aggregated
+
+
+			next_aggregated = sorted(list(set(next_aggregated)))
+			
+			if not next_aggregated:
 				continue
 
-			g = states_by_group.get(g_name, states_by_group.setdefault(g_name,set()) )
-			g.add(s['name'])
+			print "\t" * 2, next_aggregated
 
+			aggregated_state_id = ';'.join(next_aggregated)
 
+						
+			if aggregated_state_id not in fsm2.states:
 
-		print 1
-		
-		groups_by_parent = {}
-		for s in self.states.values():
-
-			group_name   = s['group']
-			parent_group = s['parent_group']
-			
-			print group_name, parent_group
-
-			groups_by_parent.get(group_name, groups_by_parent.setdefault(group_name, set()) )
-			
-			states = groups_by_parent.get(parent_group, groups_by_parent.setdefault(parent_group, set()) )
-			states.add(group_name)
-
-		print "----"
-
-		def _create_subgraphs(G, parent_graph=None, parent_group=None, level=0):
-
-			if parent_graph is None:
-				print ' ' * level, 'x'
-				parent_graph = G
-
-			group_names = groups_by_parent.get(parent_group, [])
-			for g_name in group_names:
-
-				states    = list(states_by_group[g_name])
-				subgroups = list([GROUP_NAME % (name) for name in groups_by_parent.get(g_name,[])])
-
-				graph = parent_graph.get_subgraph(name=GROUP_NAME % (g_name))
-				if graph is None:
-					graph = parent_graph.add_subgraph(
-						[], 
-						name=GROUP_NAME % (g_name), 
-						label=g_name, 
-						rankdir='LR', 
-						clusterrank='local', 
-						rank='same ' + ' '.join([ '%s;'%(s) for s in states+subgroups])
-					)
-					created = True
-				else:
-					created = False
-
-
-
-				print ' ' * level, g_name, states+subgroups, parent_group, repr(parent_graph), created
-
-				for state_name in states:
+				fsm2.set_state(aggregated_state_id)
 					
-					state_info = self.states[state_name]
+				aggregated_to_process.append(next_aggregated)
 					
-					options = {
-						'rank': 'same'
-					}
-					if state_info['type'] == FiniteStateMachine.STATE_FINAL:
-						options['shape']="doublecircle"
-					graph.add_node(state_name, **options)
+				print "\t" * 3, "ADDED"
+					
+					
+			for input in inputs:
+					
+				print "\t" * 3, "ADDED TRANSITION", input.id, aggregated_state_id
+				fsm2.set_transition(start_aggregated_id, input, aggregated_state_id)
+			
+			turn += 1
 
+			#time.sleep(0.5)
 
-
-				_create_subgraphs(G, parent_graph=graph, parent_group=g_name, level=level+1)
-
-
-		_create_subgraphs(G)
+		print fsm2.inputs
+		print fsm2.states
+		print fsm2.transition_table
 		
-		#print G
 		
-		#for g_name, states in states_by_group.items():
-		#	G.add_subgraph(states, name="cluster_%s" % (g_name), label=g_name, rankdir='LR')
-		"""
-	
-		for start_state, transitions in self.transition_table.items():
-
-			for input, state_transition in transitions.items():
-				
-				input = self.inputs[input]
-				
-				for transition_info in state_transition:
-
-					next_state = transition_info['next_state']
-
-					state_info = self.states[next_state]
+		return fsm2
 
 
-					options = {}
-					#if start_state > next_state:
-					#	options['weight'] = 0
-
-					G.add_edge(start_state, next_state, label=input.to_string(), **options)
-
-		print G
-
-		G.draw(file_name, prog='dot')
-
-		
 #----------------------------------------------------------------------#
 #                                                                      #
 #----------------------------------------------------------------------#

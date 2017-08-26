@@ -225,8 +225,9 @@ if __name__ == "__main__":
 	
 	p2 = SinglePattern('B', CharInput('b'))
 
-	p = AlternativePattern('OR', [p, p2] )
-	#p = SequencePattern('AB', [p, p2] )
+	#p = AlternativePattern('OR', [p, p2] )
+	
+	p = SequencePattern('AB', [p, p2] )
 	
 	#p = RepetitionPattern('2', SinglePattern('1','a') )
 	
@@ -251,12 +252,16 @@ if __name__ == "__main__":
 
 	#p = OptionalPattern('?', p)
 	
-	#p = RepetitionPattern('+', p)
+	p = RepetitionPattern('+', p)
 
 	
 
 	
 	fsm = p.create_state_machine()
+	
+	fsm = fsm.reduce()
+
+	print "=" * 80
 
 	from fsm.draw import GraphvizDrawer
 
