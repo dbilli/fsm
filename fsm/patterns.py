@@ -1,5 +1,6 @@
 
 from fsm.machine import FiniteStateMachine
+from fsm.machine import CharInput
 
 #----------------------------------------------------------------------#
 #                                                                      #
@@ -219,7 +220,6 @@ class OptionalPattern(BasePatternMachine):
 
 if __name__ == "__main__":
 
-	from fsm.machine import CharInput
 
 	p = SinglePattern('A', CharInput('a'))
 	
@@ -257,6 +257,10 @@ if __name__ == "__main__":
 
 	
 	fsm = p.create_state_machine()
+
+	from fsm.draw import GraphvizDrawer
+
+	d = GraphvizDrawer()
 	
-	fsm.draw('fsm.jpg')
+	d.draw(fsm, 'fsm.jpg')
 

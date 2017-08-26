@@ -9,19 +9,17 @@ GROUP_NAME = "cluster_%s"
 #----------------------------------------------------------------------#
 
 class MachineInput(object):
-	
+
 	__id = 0
-	
+
 	@staticmethod
 	def get_next_id():
 		v = MachineInput.__id
 		MachineInput.__id += 1
-		print __file__, v
 		return v
-	
-	
-	def __init__(self):
-		self.id = MachineInput.get_next_id()
+
+	def __init__(self, id=None):
+		self.id = id or MachineInput.get_next_id()
 
 	def match(self, input):
 		raise Exception("NOT IMPLEMENTED")
@@ -72,8 +70,14 @@ class FiniteStateMachine(object):
 	EPSILON = Epsilon()
 
 	def __init__(self):
-		
+
+		self.inputs = {}
+
+
+
 		self.states = {}
+		
+		self.state_handlers = {}
 
 		#
 		# transition_table = {
@@ -86,7 +90,6 @@ class FiniteStateMachine(object):
 
 		self.transition_table = {}
 		
-		self.inputs = {}
 		
 	def get_initial_state(self):
 		start = None
@@ -134,6 +137,10 @@ class FiniteStateMachine(object):
 	def set_state(self, state, **options):
 		s = self.states.get(state, self.states.setdefault(state, {'name': state, 'type': FiniteStateMachine.STATE_NORMAL, 'group':None}) )
 		s.update( options )
+		
+	def set_state_handler(self, state, handler):
+		self.state_handlers[state] = handler
+
 
 	def set_normal(self, state):
 		self.set_state(state, type=FiniteStateMachine.STATE_NORMAL)
@@ -143,6 +150,7 @@ class FiniteStateMachine(object):
 
 	def set_end(self, state):
 		self.set_state(state, type=FiniteStateMachine.STATE_FINAL)
+
 
 	def set_e_transition(self, start_state, next_state):
 		
@@ -307,21 +315,30 @@ class FiniteStateMachine(object):
 class MachineRunner(object):
 	
 	def __init__(self):
-		self.current_state = set()
+		self.machine_state = {
+			'current_state': set()
+		}
 		
 	def set_current_state(self, *state):
-		self.current_state = set(*state)
+		self.machine_state['current_state'] = set(*state)
+		
+	def get_current_state(self):
+		return self.machine_state['current_state']
 	
 	def run_machine(self, fsm, input_data):
 		
-		if not self.current_state:
-			self.current_state = fsm.get_initial_state()
+		current_state = self.get_current_state()
 		
-		print "INITIAL STATE", self.current_state
+		if not current_state:
+			current_state = fsm.get_initial_state()
+			
+			self.set_current_state(current_state)
+		
+		print "INITIAL STATE", current_state
 		
 		final_states = set()
 		
-		for s in self.current_state:
+		for s in current_state:
 			
 			transitions = fsm.transition_table.get(s,[])
 			
@@ -341,9 +358,18 @@ class MachineRunner(object):
 				
 					print "NEXT_STATE", next_state
 					
+					handler = fsm.state_handlers.get(next_state, None)
+					if handler:
+						handler(fsm, s)
+
 					final_states |= fsm.e_reduce(next_state)
 
-		print final_states
+		self.set_current_state(final_states)
+		
+		for s in final_states:
+			handler = fsm.state_handlers.get(s, None)
+			if handler:
+				handler(fsm, s)
 
 
 if __name__ == "__main__":
@@ -356,14 +382,23 @@ if __name__ == "__main__":
 	fsm.set_state('a_s', group='A')
 	fsm.set_state('a_e', group='A')
 	
+	
+	def _print_state(fsm, current_state):
+		print "HANDLER", current_state
+	
+	fsm.set_state_handler('a_e', _print_state)
+	
 	fsm.set_transition('a_s', CharInput('a'), 'a_e')
 
 	fsm.set_e_transition(FiniteStateMachine.START, 'a_s')
 
 	fsm.set_e_transition('a_e', FiniteStateMachine.END)
 
-	print fsm.states
-	
+	print "-------"
 	mr = MachineRunner()
 	
 	mr.run_machine(fsm, 'a')
+	
+	print "-------"
+	cs = mr.get_current_state()
+	print cs
