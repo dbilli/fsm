@@ -1,8 +1,5 @@
 import time
 
-GROUP_NAME = "g_%s"
-
-GROUP_NAME = "cluster_%s"
 
 #----------------------------------------------------------------------#
 #                                                                      #
@@ -72,8 +69,6 @@ class FiniteStateMachine(object):
 	def __init__(self):
 
 		self.inputs = {}
-
-
 
 		self.states = {}
 		
@@ -189,15 +184,19 @@ class FiniteStateMachine(object):
 		
 		s_start = fsm.get_initial_state()
 		
+		type=FiniteStateMachine.STATE_START
 		aggregated = []
 		for s in s_start:
 			aggregated.append(s)
 			for next_s in fsm.e_reduce(s):
 				aggregated.append(next_s)
+			
+			if fsm.states[s]['type'] == FiniteStateMachine.STATE_FINAL:
+				type=FiniteStateMachine.STATE_FINAL
 
 		aggregated = sorted(set(aggregated))
 		aggregated_state = ';'.join(sorted(aggregated))
-		fsm2.set_state(aggregated_state, type=FiniteStateMachine.STATE_START)
+		fsm2.set_state(aggregated_state, type=type)
 		
 		print "START", aggregated_state
 
@@ -258,8 +257,13 @@ class FiniteStateMachine(object):
 
 						
 			if aggregated_state_id not in fsm2.states:
+				
+				options = {}
+				for s in next_aggregated:
+					if fsm.states[s]['type'] in [FiniteStateMachine.STATE_FINAL]:
+						options['type'] = FiniteStateMachine.STATE_FINAL
 
-				fsm2.set_state(aggregated_state_id)
+				fsm2.set_state(aggregated_state_id, **options)
 					
 				aggregated_to_process.append(next_aggregated)
 					

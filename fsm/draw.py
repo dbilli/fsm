@@ -4,6 +4,12 @@ import pydot as pgv
 
 from fsm.machine import FiniteStateMachine
 
+
+GROUP_NAME = "g_%s"
+
+GROUP_NAME = "CLUSTER%s"
+
+
 class GraphvizDrawer(object):
 	
 	@staticmethod
@@ -29,14 +35,23 @@ class GraphvizDrawer(object):
 		G = pgv.Dot(graph_type='digraph')
 		
 
+		print '*' * 80
+		
 		for state, state_info in fsm.states.items():
-			options = {}
-			if state_info['type'] in [ FiniteStateMachine.STATE_START, FiniteStateMachine.STATE_FINAL]:
-				options['shape'] = "doublecircle"
+			options = {
+				'style':'filled'
+			}
+			if state_info['type'] == FiniteStateMachine.STATE_START:
+				options['fillcolor'] = "green"
+			if state_info['type'] == FiniteStateMachine.STATE_FINAL:
+				#options['shape'] = "doublecircle"
+				options['fillcolor'] = "blue"
 			G.add_node(pgv.Node(state, **options))
 
-		"""
-		print G
+
+		print G.to_string()
+		print '*' * 80
+		
 
 		states_by_group = {}
 		for s in fsm.states.values():
@@ -48,17 +63,15 @@ class GraphvizDrawer(object):
 			g = states_by_group.get(g_name, states_by_group.setdefault(g_name,set()) )
 			g.add(s['name'])
 
-
-
 		print 1
 		
 		groups_by_parent = {}
 		for s in fsm.states.values():
 
 			group_name   = s['group']
-			parent_group = s['parent_group']
+			parent_group = s.get('parent_group', 'GLOBAL')	
 			
-			print group_name, parent_group
+			print group_name, parent_group, s
 
 			groups_by_parent.get(group_name, groups_by_parent.setdefault(group_name, set()) )
 			
@@ -75,20 +88,29 @@ class GraphvizDrawer(object):
 
 			group_names = groups_by_parent.get(parent_group, [])
 			for g_name in group_names:
+				
+				print g_name
 
-				states    = list(states_by_group[g_name])
+				states    = list(states_by_group.get(g_name,[]))
 				subgroups = list([GROUP_NAME % (name) for name in groups_by_parent.get(g_name,[])])
 
 				graph = parent_graph.get_subgraph(name=GROUP_NAME % (g_name))
-				if graph is None:
-					graph = parent_graph.add_subgraph(
-						[], 
-						name=GROUP_NAME % (g_name), 
-						label=g_name, 
-						rankdir='LR', 
-						clusterrank='local', 
-						rank='same ' + ' '.join([ '%s;'%(s) for s in states+subgroups])
-					)
+				
+				
+				print "SUBGRA", graph
+				if not graph:
+
+					graph = pgv.Cluster(graph_name=GROUP_NAME % (g_name))
+
+					#graph = parent_graph.add_subgraph(
+					#	[], 
+					#	name=GROUP_NAME % (g_name), 
+					#	label=g_name, 
+					#	rankdir='LR', 
+					#	clusterrank='local', 
+					#	rank='same ' + ' '.join([ '%s;'%(s) for s in states+subgroups])
+					#)
+					parent_graph.add_subgraph(graph)
 					created = True
 				else:
 					created = False
@@ -106,7 +128,8 @@ class GraphvizDrawer(object):
 					}
 					if state_info['type'] == FiniteStateMachine.STATE_FINAL:
 						options['shape']="doublecircle"
-					graph.add_node(state_name, **options)
+						
+					graph.add_node(pgv.Node(state_name, **options))
 
 
 
@@ -119,8 +142,10 @@ class GraphvizDrawer(object):
 		
 		#for g_name, states in states_by_group.items():
 		#	G.add_subgraph(states, name="cluster_%s" % (g_name), label=g_name, rankdir='LR')
-		"""
 	
+		#
+		# EDGES
+		#
 		for start_state, transitions in fsm.transition_table.items():
 
 			for input, state_transition in transitions.items():
@@ -147,7 +172,7 @@ class GraphvizDrawer(object):
 					#	options['weight'] = 0
 					G.add_edge(pgv.Edge(start_state, next_state, **options))
 
-		print G
+		print G.to_string()
 
 		G.write_png(file_name)#, prog='dot')
 
